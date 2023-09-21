@@ -1,0 +1,78 @@
+# Function to test DNS block
+function testDNSBlock {
+    # Get the original DNS server
+    $originalDns = Get-DnsClientServerAddress -InterfaceAlias "Ethernet 3" | Where-Object {$_.AddressFamily -eq "IPv4"}
+
+    Write-Host "Original DNS Server: $($originalDns.ServerAddresses)"
+
+    # Resolve the IP address of a test malicious domain
+    $maliciousIp = [System.Net.Dns]::GetHostAddresses("malware.testcategory.com")[0].ToString()
+
+    if ($maliciousIp -eq "0.0.0.0") {
+        Write-Host "DNS Filtering is enabled."
+    } else {
+        Write-Host "Host is not using DNS Filtering."
+    }
+}
+
+# Function to enable DNS over HTTPS (DoH)
+function enableDoH {
+    # Set EnableAutoDoH registry value to 2
+    Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\Dnscache\Parameters" -Name "EnableAutoDoH" -Value 2
+
+    # Reboot the computer
+    Restart-Computer -Force
+}
+
+
+# Function to set up Quad DoH
+
+function setupQuadDoH {
+    # Change the DNS server of Ethernet 3 to 1.1.1.2
+    Write-Host "Setting DNS server for Ethernet 3 to 1.1.1.2..."
+    Set-DnsClientServerAddress -InterfaceAlias "Ethernet 3" -ServerAddresses "1.1.1.2"
+
+    # Enable DoH on Ethernet 3 using the registry
+    $guid = (Get-NetAdapter -InterfaceAlias "Ethernet 3").InterfaceGuid
+    $regPath = "HKLM:\System\CurrentControlSet\Services\Dnscache\InterfaceSpecificParameters\$guid\DohInterfaceSettings\Doh\1.1.1.2"
+
+    # Create the registry path if it doesn't exist
+    if (-not (Test-Path $regPath)) {
+        Write-Host "Creating registry path..."
+        New-Item -Path $regPath -Force
+    }
+
+    # Enable DoH by setting the DohFlags property
+    Write-Host "Enabling DoH for Ethernet 3..."
+    Set-ItemProperty -Path $regPath -Name "DohFlags" -Value 1
+
+    Write-Host "Quad DoH configuration completed for Ethernet 3."
+}
+
+
+function resetDoH {
+    # Reset DNS server for Ethernet 3 to the original DNS server (e.g., 10.0.2.3)
+    Set-DnsClientServerAddress -InterfaceAlias "Ethernet 3" -ResetServerAddresses
+    Write-Host "DNS settings reset to the original values."
+}resetDoH
+
+
+
+# Main script
+$command = $args[0]
+
+if ($command -eq "DoH-test") {
+    testDNSBlock
+}
+elseif ($command -eq "DoH-enable") {
+    enableDoH
+}
+elseif ($command -eq "DoH-setupQuad") {
+    setupQuadDoH
+}
+elseif ($command -eq "DoH-reset") {
+    resetDoH
+}
+else {
+    Write-Host "Unknown command. Usage: defend.ps1 DoH-test|DoH-enable|DoH-setupQuad|DoH-reset"
+}
