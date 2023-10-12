@@ -1,0 +1,11 @@
+﻿<group name="windows,sysmon">
+<rule id="108701" level="10">
+ <if_group>windows</if_group>
+ <field name="win.eventdata.ruleName" type="pcre2">technique_id=T1018,technique_name=Remote System Discovery</field>
+ <field name="win.eventdata.parentcommandline" type="pcre2" negate="yes">.*cmd.exe.*</field>
+ <description>Enumerate account</description>
+<mitre>
+ <id>T108701</id>
+ </mitre>
+</rule>
+</group>
